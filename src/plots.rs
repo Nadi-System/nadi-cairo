@@ -100,7 +100,7 @@ impl FromAttributeRelaxed for NetworkPlotConfig {
 
 /// Create a SVG file with the given network structure
 pub fn export_svg_table(
-    net: &mut Network,
+    net: &Network,
     table: Table,
     outfile: PathBuf,
     config: NetworkPlotConfig,
@@ -137,7 +137,7 @@ pub fn export_svg_table(
             row.iter()
                 .map(|cell| {
                     ctx.text_extents(cell)
-                        .map(|et| et.width())
+                        .map(|et| et.width())g
                         .unwrap_or_default()
                 })
                 .collect()
@@ -205,7 +205,7 @@ pub fn export_svg_table(
             let x = n.level() as f64 * delx + config.offset / 2.0;
 
             ctx.set_source_rgb(0.35, 0.35, 0.6);
-            if let RSome(o) = n.output() {
+            for o in n.outputs() {
                 let o = o.lock();
                 let yo = height - (o.index() + 1) as f64 * dely;
                 let xo = o.level() as f64 * delx + config.offset / 2.0;

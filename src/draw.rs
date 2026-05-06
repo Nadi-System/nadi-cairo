@@ -37,10 +37,7 @@ impl From<Color> for CairoColor {
 }
 
 pub fn draw_node(node: &NodeInner, ctx: &Context, x: f64, y: f64) -> cairo::Result<()> {
-    node.node_color()
-        .map(CairoColor::from)
-        .unwrap_or_default()
-        .set(ctx);
+    CairoColor::from(node.node_color()).set(ctx);
     let size = node.node_size();
     match node.node_shape() {
         NodeShape::Square => {
@@ -105,10 +102,7 @@ pub fn draw_line(
     x2: f64,
     y2: f64,
 ) -> cairo::Result<()> {
-    node.line_color()
-        .map(CairoColor::from)
-        .unwrap_or_default()
-        .set(ctx);
+    CairoColor::from(node.line_color()).set(ctx);
     ctx.set_line_width(node.line_width());
     ctx.move_to(x1, y1);
     ctx.line_to(x2, y2);
@@ -117,10 +111,7 @@ pub fn draw_line(
 }
 
 pub fn draw_text(node: &NodeInner, ctx: &Context, x: f64, y: f64, text: &str) -> cairo::Result<()> {
-    node.text_color()
-        .map(CairoColor::from)
-        .unwrap_or_default()
-        .set(ctx);
+    CairoColor::from(node.text_color()).set(ctx);
     ctx.move_to(x, y);
     ctx.show_text(text)
 }

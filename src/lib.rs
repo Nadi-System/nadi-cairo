@@ -8,6 +8,7 @@ mod cairo {
     use super::plots::*;
     use nadi_core::abi_stable::std_types::RSome;
     use nadi_core::anyhow::{self, Context};
+    use nadi_core::functions::FunctionRet;
     use nadi_core::graphics::color::AttrColor;
     use nadi_core::nadi_plugin::network_func;
     use nadi_core::prelude::*;
@@ -19,12 +20,12 @@ mod cairo {
     /// Create a SVG file with the given network structure
     #[network_func(config = NetworkPlotConfig::default(), fit = false)]
     fn network(
-        net: &mut Network,
+        net: &Network,
         outfile: PathBuf,
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
         label: Option<Template>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<FunctionRet> {
         let n = net.nodes_count();
         if n == 0 {
             return Err(anyhow::Error::msg("Empty Network"));
@@ -58,9 +59,9 @@ mod cairo {
             dely = (config.height - 2.0 * config.radius) / (n + 2) as f64;
             width = config.width;
             height = config.height;
-            cairo::SvgSurface::new(config.width, config.height, Some(outfile))?
+            cairo::SvgSurface::new(config.width, config.height, Some(outfile.clone()))?
         } else {
-            cairo::SvgSurface::new(width, height, Some(outfile))?
+            cairo::SvgSurface::new(width, height, Some(outfile.clone()))?
         };
 
         let ctx = cairo::Context::new(&mut surf)?;
@@ -76,8 +77,8 @@ mod cairo {
                 let n = n.lock();
                 let y = height - (n.index() + 1) as f64 * dely;
                 let x = n.level() as f64 * delx + delx / 2.0;
-
-                if let RSome(o) = n.output() {
+                // TODO: fix for self node loops
+                for o in n.outputs() {
                     let o = o.lock();
                     let yo = height - (o.index() + 1) as f64 * dely;
                     let xo = o.level() as f64 * delx + delx / 2.0;
@@ -94,17 +95,22 @@ mod cairo {
                 draw_text(&n, &ctx, offset, y, &l)
             })?;
 
-        Ok(())
+        Ok(FunctionRet::Image(
+            outfile.to_string_lossy().to_string().into(),
+        ))
     }
     /// Create a SVG file with the given network structure
     #[network_func(config = NetworkPlotConfig::default(), fit = false)]
     fn table(
-        net: &mut Network,
+        net: &Network,
         table: Table,
         outfile: PathBuf,
         #[relaxed] config: NetworkPlotConfig,
         fit: bool,
-    ) -> anyhow::Result<()> {
-        export_svg_table(net, table, outfile, config, fit)
+    ) -> anyhow::Result<FunctionRet> {
+        export_svg_table(net, table, outfile.clone(), config, fit)?;
+        Ok(FunctionRet::Image(
+            outfile.to_string_lossy().to_string().into(),
+        ))
     }
 }
