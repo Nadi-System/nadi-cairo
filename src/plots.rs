@@ -137,7 +137,7 @@ pub fn export_svg_table(
             row.iter()
                 .map(|cell| {
                     ctx.text_extents(cell)
-                        .map(|et| et.width())g
+                        .map(|et| et.width())
                         .unwrap_or_default()
                 })
                 .collect()
