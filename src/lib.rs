@@ -99,6 +99,7 @@ mod cairo {
             outfile.to_string_lossy().to_string().into(),
         ))
     }
+
     /// Create a SVG file with the given network structure
     #[network_func(config = NetworkPlotConfig::default(), fit = false)]
     fn table(
@@ -109,6 +110,31 @@ mod cairo {
         fit: bool,
     ) -> anyhow::Result<FunctionRet> {
         export_svg_table(net, table, outfile.clone(), config, fit)?;
+        Ok(FunctionRet::Image(
+            outfile.to_string_lossy().to_string().into(),
+        ))
+    }
+
+    /// Create a SVG file with the given network structure and series
+    #[network_func(config = NetworkPlotConfig::default(), fit = false, normalize = false, arrow_width = 100.0)]
+    fn plot(
+        net: &Network,
+        series: String,
+        outfile: PathBuf,
+        #[relaxed] config: NetworkPlotConfig,
+        fit: bool,
+        arrow_width: f64,
+        normalize: bool,
+    ) -> anyhow::Result<FunctionRet> {
+        export_svg_plot(
+            net,
+            &series,
+            outfile.clone(),
+            config,
+            fit,
+            arrow_width,
+            normalize,
+        )?;
         Ok(FunctionRet::Image(
             outfile.to_string_lossy().to_string().into(),
         ))

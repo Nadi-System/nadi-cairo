@@ -233,6 +233,149 @@ pub fn export_svg_table(
     Ok(())
 }
 
+/// Create a SVG file with the given network structure and series
+pub fn export_svg_plot(
+    net: &Network,
+    series: &str,
+    outfile: PathBuf,
+    config: NetworkPlotConfig,
+    fit: bool,
+    awidth: f64,
+    normalize: bool,
+) -> anyhow::Result<()> {
+    let n = net.nodes_count();
+    if n == 0 {
+        return Err(anyhow::Error::msg("Empty Network"));
+    }
+    let headers: [&str; 2] = ["Node", series];
+    let labels: Vec<&str> = net
+        .nodes()
+        .map(|n| n.name())
+        .collect::<Vec<&str>>()
+        .into_iter()
+        .rev()
+        .collect();
+
+    let mut surf = cairo::SvgSurface::new::<&std::path::Path>(config.width, config.height, None)?;
+    let ctx = cairo::Context::new(&mut surf)?;
+    ctx.set_line_width(1.0);
+    ctx.set_font_size(config.fontsize);
+    ctx.set_font_face(&config.fontface);
+
+    let header_widths: [f64; 2] = headers.map(|cell| {
+        ctx.text_extents(cell)
+            .map(|et| et.width())
+            .unwrap_or_default()
+    });
+    let contents_widths: Vec<f64> = labels
+        .iter()
+        .map(|cell| {
+            ctx.text_extents(cell)
+                .map(|et| et.width())
+                .unwrap_or_default()
+        })
+        .collect();
+
+    let label_width = contents_widths
+        .iter()
+        .cloned()
+        .fold(header_widths[0], f64::max);
+
+    let twidth: f64 = label_width + config.delta_x;
+    let mut delx = config.delta_x;
+    let mut dely = config.delta_y;
+
+    let max_level = net.nodes().map(|n| n.lock().level()).max().unwrap_or(0);
+
+    let mut width =
+        delx * max_level as f64 + 2.0 * config.radius + twidth + awidth + config.offset * 2.0;
+    let mut height = dely * (n + 2) as f64 + 2.0 * config.radius;
+
+    let mut surf = if fit {
+        delx = (config.width - 2.0 * config.radius - twidth - awidth) / (max_level + 1) as f64;
+        dely = (config.height - 2.0 * config.radius) / (n + 2) as f64;
+        width = config.width;
+        height = config.height;
+        cairo::SvgSurface::new(config.width, config.height, Some(outfile))?
+    } else {
+        cairo::SvgSurface::new(width, height, Some(outfile))?
+    };
+
+    let net_width = max_level as f64 * delx + config.offset / 2.0;
+    let stops: [f64; 3] = [
+        config.offset,
+        config.offset + net_width,
+        config.offset + net_width + twidth,
+    ];
+
+    let ctx = cairo::Context::new(&mut surf)?;
+    ctx.set_line_width(1.0);
+    ctx.set_font_size(config.fontsize);
+    ctx.set_font_face(&config.fontface);
+    ctx.set_source_rgb(0.35, 0.35, 0.6);
+
+    ctx.move_to(stops[1], dely);
+    ctx.show_text(headers[0])?;
+    ctx.move_to(stops[2] + (awidth - header_widths[1]) / 2.0, dely);
+    ctx.show_text(headers[1])?;
+
+    ctx.move_to(delx, dely * 1.5);
+    ctx.line_to(width, dely * 1.5);
+    ctx.stroke()?;
+
+    let min_max: Option<(f64, f64)> = if normalize {
+        let min_max: Vec<(f64, f64)> = net
+            .nodes()
+            .filter_map(|n| {
+                let n = n.lock();
+                let s = n.series(series)?;
+                Some((s.minimum().ok().flatten()?, s.maximum().ok().flatten()?))
+            })
+            .filter_map(|(a, b)| Some((f64::from_attr_relaxed(&a)?, f64::from_attr_relaxed(&b)?)))
+            .collect();
+        let min = min_max
+            .iter()
+            .map(|(a, _)| *a)
+            .fold(f64::INFINITY, f64::min);
+        let max = min_max
+            .iter()
+            .map(|(_, b)| *b)
+            .fold(-f64::INFINITY, f64::max);
+        Some((min, max))
+    } else {
+        None
+    };
+
+    net.nodes_rev()
+        .zip(labels)
+        .try_for_each(|(n, lab)| -> cairo::Result<()> {
+            let n = n.lock();
+            let y = height - (n.index() + 1) as f64 * dely;
+            let x = n.level() as f64 * delx + config.offset / 2.0;
+
+            ctx.set_source_rgb(0.35, 0.35, 0.6);
+            for o in n.outputs() {
+                let o = o.lock();
+                let yo = height - (o.index() + 1) as f64 * dely;
+                let xo = o.level() as f64 * delx + config.offset / 2.0;
+                let dx = xo - x;
+                let dy = yo - y;
+                let l = (dx.powi(2) + dy.powi(2)).sqrt();
+                let (ux, uy) = (dx / l, dy / l);
+                let size = n.node_size();
+                let (sx, sy) = (x + ux * size * 1.4, y + uy * size * 1.4);
+                let (ex, ey) = (xo - ux * size * 1.4, yo - uy * size * 1.4);
+                draw_line(&n, &ctx, sx, sy, ex, ey)?;
+            }
+            draw_node(&n, &ctx, x, y)?;
+            draw_text(&n, &ctx, stops[1], y, lab)?;
+            draw_series(&n, &ctx, stops[2], y, series, dely * 0.5, awidth, min_max)?;
+            Ok(())
+        })?;
+
+    Ok(())
+}
+
 pub fn calc_text_width(
     texts: &[String],
     ctx: &cairo::Context,
