@@ -169,7 +169,7 @@ pub fn draw_series(
                     };
                     let diff = max - min;
                     let delx = wd / (vals.len() as f64);
-                    ctx.move_to(x, y - (first - min) * ht);
+                    ctx.move_to(x, y - (first - min) / diff * ht);
                     vals.iter()
                         .map(|v| (v - min) / diff)
                         .enumerate()

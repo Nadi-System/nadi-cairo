@@ -369,7 +369,7 @@ pub fn export_svg_plot(
             }
             draw_node(&n, &ctx, x, y)?;
             draw_text(&n, &ctx, stops[1], y, lab)?;
-            draw_series(&n, &ctx, stops[2], y, series, dely * 0.5, awidth, min_max)?;
+            draw_series(&n, &ctx, stops[2], y, series, dely * 0.8, awidth, min_max)?;
             Ok(())
         })?;
 
